@@ -8,21 +8,8 @@ import {
 	ChartLegendContent,
 } from '@/components/ui/chart';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
-
-const chartData = [
-	{ month: 'Jan', successful: 130, failed: 190 },
-	{ month: 'Feb', successful: 130, failed: 90 },
-	{ month: 'Mar', successful: 140, failed: 90 },
-	{ month: 'Apr', successful: 190, failed: 120 },
-	{ month: 'May', successful: 130, failed: 170 },
-	{ month: 'Jun', successful: 120, failed: 100 },
-	{ month: 'Jul', successful: 110, failed: 100 },
-	{ month: 'Aug', successful: 150, failed: 120 },
-	{ month: 'Sept', successful: 140, failed: 100 },
-	{ month: 'Oct', successful: 130, failed: 180 },
-	{ month: 'Nov', successful: 160, failed: 20 },
-	{ month: 'Dec', successful: 120, failed: 180 },
-];
+import { useDashboardChart, Period } from '@/lib/api/dashboard';
+import { useMemo } from 'react';
 
 const chartConfig = {
 	successful: {
@@ -41,6 +28,75 @@ type SyncChartProps = {
 };
 
 export function SyncChart({ period, onPeriodChange }: SyncChartProps) {
+	const { data: chartData, isLoading, error } = useDashboardChart(period as Period);
+
+	// Transform API data to chart format
+	const transformedData = useMemo(() => {
+		if (!chartData?.period_data) return [];
+
+		return chartData.period_data.map((item) => ({
+			label: item.label,
+			successful: item.success,
+			failed: item.failed,
+		}));
+	}, [chartData]);
+
+	// Calculate max value for Y-axis domain
+	const maxValue = useMemo(() => {
+		if (transformedData.length === 0) return 200;
+		const max = Math.max(
+			...transformedData.map((d) => Math.max(d.successful, d.failed))
+		);
+		// Round up to nearest 50 for cleaner Y-axis
+		return Math.ceil(max / 50) * 50 || 200;
+	}, [transformedData]);
+
+	// Generate Y-axis ticks based on max value
+	const yAxisTicks = useMemo(() => {
+		const ticks: number[] = [];
+		const step = Math.ceil(maxValue / 4);
+		for (let i = 0; i <= maxValue; i += step) {
+			ticks.push(i);
+		}
+		return ticks.length > 0 ? ticks : [0, 50, 100, 150, 200];
+	}, [maxValue]);
+
+	if (isLoading) {
+		return (
+			<Card className="bg-card rounded-2xl border border-border">
+				<CardHeader>
+					<div className="flex items-center justify-between">
+						<CardTitle>Successful vs Failed Syncs (Bar Chart)</CardTitle>
+						<DateFilter value={period} onChange={onPeriodChange} />
+					</div>
+				</CardHeader>
+				<CardContent>
+					<div className="h-[400px] flex items-center justify-center text-muted-foreground">
+						Loading chart data...
+					</div>
+				</CardContent>
+			</Card>
+		);
+	}
+
+	if (error || !chartData || transformedData.length === 0) {
+		return (
+			<Card className="bg-card rounded-2xl border border-border">
+				<CardHeader>
+					<div className="flex items-center justify-between">
+						<CardTitle>Successful vs Failed Syncs (Bar Chart)</CardTitle>
+						<DateFilter value={period} onChange={onPeriodChange} />
+					</div>
+				</CardHeader>
+				<CardContent>
+					<div className="h-[400px] flex items-center justify-center text-red-400">
+						Failed to load chart data. Please try again.
+					</div>
+				</CardContent>
+			</Card>
+		);
+	}
+
 	return (
 		<Card className="bg-card rounded-2xl border border-border">
 			<CardHeader>
@@ -52,10 +108,10 @@ export function SyncChart({ period, onPeriodChange }: SyncChartProps) {
 
 			<CardContent>
 				<ChartContainer config={chartConfig} className="h-[400px] text-white w-full border border-border rounded-2xl p-4">
-					<BarChart data={chartData}>
+					<BarChart data={transformedData}>
 						<CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
 						<XAxis
-							dataKey="month"
+							dataKey="label"
 							tickLine={false}
 							axisLine={false}
 							tickMargin={8}
@@ -66,8 +122,8 @@ export function SyncChart({ period, onPeriodChange }: SyncChartProps) {
 							axisLine={false}
 							tickMargin={8}
 							className="text-xs text-white"
-							domain={[0, 200]}
-							ticks={[0, 50, 100, 150, 200]}
+							domain={[0, maxValue]}
+							ticks={yAxisTicks}
 						/>
 						<ChartTooltip content={<ChartTooltipContent />} />
 						<ChartLegend content={<ChartLegendContent payload={undefined} />} />

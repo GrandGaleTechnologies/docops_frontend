@@ -2,6 +2,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DateFilter } from '@/components/dashboard/DateFilter';
 import { RefreshCw, Folder, Link2, XCircle, CheckCircle2, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useDashboardStats, Period } from '@/lib/api/dashboard';
+import { format } from 'date-fns';
 
 interface StatCardProps {
 	icon: React.ReactNode;
@@ -32,11 +34,61 @@ type SummaryStatsProps = {
 	onPeriodChange: (value: 'month' | 'week' | 'day') => void;
 };
 
+function formatLastSyncDate(dateString: string): string {
+	try {
+		const date = new Date(dateString);
+		return format(date, 'dd/MM/yy h:mm a');
+	} catch {
+		return '—';
+	}
+}
+
+function formatDuration(ms: number): string {
+	if (ms < 1000) {
+		return `${ms}ms`;
+	}
+	const seconds = (ms / 1000).toFixed(1);
+	return `${seconds} secs`;
+}
+
 export function SummaryStats({ period, onPeriodChange }: SummaryStatsProps) {
+	const { data: stats, isLoading, error } = useDashboardStats(period as Period);
+
+	// Show loading state or error state
+	if (isLoading) {
+		return (
+			<div className="space-y-6">
+				<div className="flex items-center justify-between">
+					<h1 className="text-4xl font-bold text-white">Welcome Back</h1>
+					<DateFilter value={period} onChange={onPeriodChange} />
+				</div>
+				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-card rounded-2xl p-4 border border-border">
+					{Array.from({ length: 8 }).map((_, i) => (
+						<StatCard key={i} icon={<RefreshCw className="h-6 w-6" />} label="Loading..." value="—" />
+					))}
+				</div>
+			</div>
+		);
+	}
+
+	if (error || !stats) {
+		return (
+			<div className="space-y-6">
+				<div className="flex items-center justify-between">
+					<h1 className="text-4xl font-bold text-white">Welcome Back</h1>
+					<DateFilter value={period} onChange={onPeriodChange} />
+				</div>
+				<div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-400">
+					Failed to load dashboard stats. Please try again.
+				</div>
+			</div>
+		);
+	}
+
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
-				<h1 className="text-4xl font-bold text-white">Welcome Back, Anthony</h1>
+				<h1 className="text-4xl font-bold text-white">Welcome Back</h1>
 				<DateFilter value={period} onChange={onPeriodChange} />
 			</div>
 
@@ -44,42 +96,42 @@ export function SummaryStats({ period, onPeriodChange }: SummaryStatsProps) {
 				<StatCard
 					icon={<RefreshCw className="h-6 w-6" />}
 					label="Last Sync at"
-					value="11/12/25/1:00pm"
+					value={stats.last_sync_at ? formatLastSyncDate(stats.last_sync_at) : '—'}
 				/>
 				<StatCard
 					icon={<RefreshCw className="h-6 w-6" />}
-					label="Avg. Sync at"
-					value="2.3 secs"
+					label="Avg. Sync Duration"
+					value={formatDuration(stats.avg_sync_duration_ms)}
 				/>
 				<StatCard
 					icon={<RefreshCw className="h-6 w-6" />}
 					label="No. of Syncs"
-					value="200"
+					value={stats.total_syncs.toLocaleString()}
 				/>
 				<StatCard
 					icon={<Folder className="h-6 w-6" />}
 					label="No. of Projects"
-					value="200"
+					value={stats.projects.toLocaleString()}
 				/>
 				<StatCard
 					icon={<Link2 className="h-6 w-6" />}
 					label="No. of Integrations"
-					value="6"
+					value={stats.no_of_integrations.toLocaleString()}
 				/>
 				<StatCard
 					icon={<ArrowUp className="h-6 w-6" />}
 					label="Pending Syncs"
-					value="400"
+					value={stats.pending_syncs.toLocaleString()}
 				/>
 				<StatCard
 					icon={<XCircle className="h-6 w-6" />}
 					label="Failed Syncs"
-					value="259"
+					value={stats.failed_syncs.toLocaleString()}
 				/>
 				<StatCard
 					icon={<CheckCircle2 className="h-6 w-6" />}
 					label="Successful Syncs"
-					value="200"
+					value={stats.successful_syncs.toLocaleString()}
 				/>
 			</div>
 		</div>

@@ -1,281 +1,414 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
+Pagination,
+PaginationContent,
+PaginationEllipsis,
+PaginationItem,
+PaginationLink,
+PaginationNext,
+PaginationPrevious,
 } from '@/components/ui/pagination';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 import { MoreVertical, Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useProjects, useUpdateProjectStatus, useDeleteProject } from '@/lib/api/projects';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { Button } from '../ui/button';
+import { formatDate } from 'date-fns';
+import { ProjectDetailModal } from './ProjectDetailModal';
+import { CreateProjectModal } from './CreateProjectModal';
+import { getProjectStatusBadge } from '@/lib/projectUtils';
+import type { Project } from '@/lib/api/projects';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
-type ProjectStatus = 'Active' | 'Inactive' | 'Pending';
+type SortOption = 'desc' | 'asc';
 
-interface ProjectRow {
-  id: string;
-  name: string;
-  status: ProjectStatus;
-  integration: string;
-  fileCount: string;
-  lastSync: string;
-  createdAt: string;
+interface ProjectsTableProps {
+  title?: string;
+  defaultPageSize?: number;
 }
 
-const mockProjects: ProjectRow[] = [
-  {
-    id: 'PRJ-001',
-    name: 'Project A',
-    status: 'Active',
-    integration: 'ACC',
-    fileCount: '200',
-    lastSync: '18/9/25 1:00pm',
-    createdAt: '01/3/25 9:30am',
-  },
-  {
-    id: 'PRJ-002',
-    name: 'Project B',
-    status: 'Pending',
-    integration: 'DroneDeploy',
-    fileCount: '150',
-    lastSync: '18/9/25 12:45pm',
-    createdAt: '12/5/25 11:15am',
-  },
-  {
-    id: 'PRJ-003',
-    name: 'Project C',
-    status: 'Inactive',
-    integration: 'ACC',
-    fileCount: '80',
-    lastSync: '—',
-    createdAt: '20/7/25 2:10pm',
-  },
-];
-
-const getStatusBadge = (status: ProjectStatus) => {
-  const colors: Record<ProjectStatus, string> = {
-    Active: 'bg-green-500/20 text-green-400 border-green-500/50',
-    Inactive: 'bg-slate-500/20 text-slate-300 border-slate-500/50',
-    Pending: 'bg-amber-500/20 text-amber-300 border-amber-500/50',
-  };
-
-  return (
-    <Badge variant="outline" className={colors[status]}>
-      {status}
-    </Badge>
-  );
-};
-
-export function ProjectsTable() {
+export function ProjectsTable({ title = 'Projects', defaultPageSize = 10 }: ProjectsTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
-  const itemsPerPage = 8;
+  const [sortBy, setSortBy] = useState<SortOption>('desc');
+  const [autoSyncFilter, setAutoSyncFilter] = useState<boolean | undefined>(undefined);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editProject, setEditProject] = useState<Project | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const filteredData = mockProjects.filter((item) =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Build query parameters
+  const queryParams = useMemo(() => {
+    const params: {
+      query?: string;
+      auto_sync?: boolean;
+      page: number;
+      size: number;
+      order_by: SortOption;
+    } = {
+      page: currentPage,
+      size: defaultPageSize,
+      order_by: sortBy,
+    };
 
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+    if (searchQuery.trim()) {
+      params.query = searchQuery.trim();
+    }
 
-  return (
+    if (autoSyncFilter !== undefined) {
+      params.auto_sync = autoSyncFilter;
+    }
+
+    return params;
+  }, [currentPage, searchQuery, autoSyncFilter, defaultPageSize, sortBy]);
+
+  const { data, isLoading, error } = useProjects(queryParams);
+  const updateStatusMutation = useUpdateProjectStatus();
+  const deleteProjectMutation = useDeleteProject();
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1); // Reset to first page on search
+  };
+
+  const handleAutoSyncFilterChange = (value: string) => {
+    if (value === 'all') {
+      setAutoSyncFilter(undefined);
+    } else if (value === 'true') {
+      setAutoSyncFilter(true);
+    } else {
+      setAutoSyncFilter(false);
+    }
+    setCurrentPage(1);
+  };
+
+  const handleDeleteProject = () => {
+    if (deleteProjectId !== null) {
+      deleteProjectMutation.mutate(deleteProjectId, {
+        onSuccess: () => {
+          setIsDeleteDialogOpen(false);
+          setDeleteProjectId(null);
+        },
+      });
+    }
+  };
+
+  const totalPages = data?.meta.total_no_pages || 1;
+  const hasNextPage = data?.meta.has_next_page || false;
+  const hasPrevPage = data?.meta.has_prev_page || false;
+
+return (
     <Card className="bg-card rounded-2xl border border-border">
       <CardHeader>
-        <CardTitle>Projects</CardTitle>
+        <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-4">
+        <div className="flex justify-between items-center gap-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Search by Project Name"
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-10"
             />
           </div>
-          <Select>
-            <SelectTrigger className="w-[140px] bg-card rounded-full border border-border">
-              <SelectValue placeholder="Filter" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select>
-            <SelectTrigger className="w-[140px] bg-card rounded-full border border-border">
-              <SelectValue placeholder="Sort" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="created">Created Date</SelectItem>
-              <SelectItem value="status">Status</SelectItem>
-            </SelectContent>
-          </Select>
+
+          <div className="flex gap-2">
+            <Select value={autoSyncFilter === undefined ? 'all' : String(autoSyncFilter)} onValueChange={handleAutoSyncFilterChange}>
+              <SelectTrigger className="w-[140px] bg-card rounded-full border border-border">
+                <SelectValue placeholder="Auto Sync" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="true">Auto Sync On</SelectItem>
+                <SelectItem value="false">Auto Sync Off</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
+              <SelectTrigger className="w-[140px] bg-card rounded-full border border-border">
+                <SelectValue placeholder="Sort" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="desc">Descending</SelectItem>
+                <SelectItem value="asc">Ascending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Project</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Integration</TableHead>
-                <TableHead>File Count</TableHead>
-                <TableHead>Last Sync</TableHead>
-                <TableHead>Created at</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedData.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="font-mono text-sm">{row.id}</TableCell>
-                  <TableCell>{row.name}</TableCell>
-                  <TableCell>{getStatusBadge(row.status)}</TableCell>
-                  <TableCell>{row.integration}</TableCell>
-                  <TableCell>{row.fileCount}</TableCell>
-                  <TableCell>{row.lastSync}</TableCell>
-                  <TableCell>{row.createdAt}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
-                        <DropdownMenuItem>Manage Integrations</DropdownMenuItem>
-                        <DropdownMenuItem>Archive Project</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        {isLoading && (
+          <div className="text-center py-8 text-muted-foreground">Loading projects...</div>
+        )}
 
-        <div className="flex justify-end">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (currentPage > 1) setCurrentPage(currentPage - 1);
-                  }}
-                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
-                />
-              </PaginationItem>
-              {Array.from({ length: totalPages }, (_, i) => {
-                const page = i + 1;
-                if (totalPages > 10) {
-                  if (page === 1 || page === totalPages) {
-                    return (
-                      <PaginationItem key={page}>
-                        <PaginationLink
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setCurrentPage(page);
-                          }}
-                          isActive={currentPage === page}
-                        >
-                          {page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  }
-                  if (page === currentPage || page === currentPage - 1 || page === currentPage + 1) {
-                    return (
-                      <PaginationItem key={page}>
-                        <PaginationLink
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setCurrentPage(page);
-                          }}
-                          isActive={currentPage === page}
-                        >
-                          {page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  }
-                  if (page === 2 || page === totalPages - 1) {
-                    return (
-                      <PaginationItem key={page}>
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    );
-                  }
-                  return null;
-                }
-                return (
-                  <PaginationItem key={page}>
-                    <PaginationLink
+        {error && (
+          <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-400 text-sm min-h-[350px] flex items-center justify-center">
+            Failed to load projects. Please try again.
+          </div>
+        )}
+
+        {!isLoading && !error && (
+          <>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Project</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Auto Sync</TableHead>
+                    <TableHead>File Count</TableHead>
+                    <TableHead>Created at</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data?.data.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        No projects found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    data?.data.map((project) => (
+                      <TableRow key={project.id}>
+                        <TableCell className="font-mono text-sm">{project.id}</TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{project.name}</div>
+                            {project.description && (
+                              <div className="text-sm text-muted-foreground truncate max-w-md">
+                                {project.description}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{getProjectStatusBadge(project.status)}</TableCell>
+                        <TableCell>
+                          {project.auto_sync === null ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : project.auto_sync ? (
+                            <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/50">
+                              On
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-slate-500/20 text-slate-300 border-slate-500/50">
+                              Off
+  </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>{project.file_count.toLocaleString()}</TableCell>
+                        <TableCell>{formatDate(project.created_at, 'dd/MM/yyyy HH:mm')}</TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedProjectId(project.id);
+                                  setIsModalOpen(true);
+                                }}
+                              >
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setEditProject(project);
+                                  setIsEditModalOpen(true);
+                                }}
+                              >
+                                Edit Project
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  updateStatusMutation.mutate({
+                                    projectId: project.id,
+                                    status: project.status === 'active' ? 'inactive' : 'active',
+                                  });
+                                }}
+                                disabled={updateStatusMutation.isPending}
+                              >
+                                {project.status === 'active' ? 'Deactivate' : 'Activate'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>Manage Integrations</DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-red-500"
+                                onClick={() => {
+                                  setDeleteProjectId(project.id);
+                                  setIsDeleteDialogOpen(true);
+                                }}
+                              >
+                                Delete Project
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex justify-end">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        setCurrentPage(page);
+                        if (hasPrevPage) setCurrentPage(currentPage - 1);
                       }}
-                      isActive={currentPage === page}
-                    >
-                      {page}
-                    </PaginationLink>
+                      className={!hasPrevPage ? 'pointer-events-none opacity-50' : ''}
+                    />
                   </PaginationItem>
-                );
-              })}
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-                  }}
-                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
+                  {Array.from({ length: totalPages }, (_, i) => {
+                    const page = i + 1;
+                    if (totalPages > 10) {
+                      if (page === 1 || page === totalPages) {
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setCurrentPage(page);
+                              }}
+                              isActive={currentPage === page}
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      }
+                      if (page === currentPage || page === currentPage - 1 || page === currentPage + 1) {
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setCurrentPage(page);
+                              }}
+                              isActive={currentPage === page}
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      }
+                      if (page === 2 || page === totalPages - 1) {
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        );
+                      }
+                      return null;
+                    }
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setCurrentPage(page);
+                          }}
+                          isActive={currentPage === page}
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (hasNextPage) setCurrentPage(currentPage + 1);
+                      }}
+                      className={!hasNextPage ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          </>
+        )}
       </CardContent>
+
+      <ProjectDetailModal
+        projectId={selectedProjectId}
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+      />
+
+      <CreateProjectModal
+        open={isEditModalOpen}
+        onOpenChange={(open) => {
+          setIsEditModalOpen(open);
+          if (!open) {
+            setEditProject(null);
+          }
+        }}
+        project={editProject}
+      />
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this project? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProject}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteProjectMutation.isPending}
+            >
+              {deleteProjectMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
