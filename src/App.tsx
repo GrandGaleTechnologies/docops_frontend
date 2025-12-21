@@ -1,11 +1,8 @@
-import { BrowserRouter, Routes, Route } from 'react-router';
+import { BrowserRouter } from 'react-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { queryClient } from '@/lib/queryClient';
-import Login from '@/pages/Login';
-import Dashboard from '@/pages/Dashboard';
-import Sync from '@/pages/Sync';
-import Projects from '@/pages/Projects';
+import { AppRoutes } from '@/components/auth/AppRoutes';
 import './App.css';
 
 function App() {
@@ -13,12 +10,7 @@ function App() {
 		<QueryClientProvider client={queryClient}>
 			<AuthProvider>
 				<BrowserRouter>
-					<Routes>
-						<Route path="/login" element={<Login />} />
-						<Route path="/" element={<Dashboard />} />
-						<Route path="/sync" element={<Sync />} />
-						<Route path="/projects" element={<Projects />} />
-					</Routes>
+					<AppRoutes />
 				</BrowserRouter>
 			</AuthProvider>
 		</QueryClientProvider>
