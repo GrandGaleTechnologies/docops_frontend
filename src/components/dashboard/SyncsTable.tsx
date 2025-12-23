@@ -296,7 +296,7 @@ export function SyncsTable({ title = 'Sync Activity', defaultPageSize = 10 }: Sy
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => {
-                                  triggerManualSyncMutation.mutate(sync.project_id);
+                                  triggerManualSyncMutation.mutate(sync.id);
                                 }}
                                 disabled={triggerManualSyncMutation.isPending}
                               >

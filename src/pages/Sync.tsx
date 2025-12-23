@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Header } from '@/components/dashboard/Header';
-import { MasterAutoSyncControl } from '@/components/dashboard/MasterAutoSyncControl';
 import { SyncsTable } from '@/components/dashboard/SyncsTable';
 import { CreateSyncModal } from '@/components/dashboard/CreateSyncModal';
 import { Button } from '@/components/ui/button';
@@ -23,7 +22,7 @@ const Sync = () => {
 					</Button>
 				</div>
 
-				<MasterAutoSyncControl />
+				{/* <MasterAutoSyncControl /> */}
 				<SyncsTable />
 
 				<CreateSyncModal

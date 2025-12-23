@@ -5,15 +5,22 @@ import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
 import Sync from '@/pages/Sync';
 import Projects from '@/pages/Projects';
+import ProjectDetail from '@/pages/ProjectDetail';
 
 const PUBLIC_ROUTES = ['/login'];
-const PROTECTED_ROUTES = ['/', '/sync', '/projects'];
+
+// Check if route matches a protected route pattern
+const isProtectedRoute = (pathname: string): boolean => {
+  if (PUBLIC_ROUTES.includes(pathname)) return false;
+  // All other routes are protected
+  return true;
+};
 
 export function AppRoutes() {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
   const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname);
-  const isProtectedRoute = PROTECTED_ROUTES.includes(location.pathname);
+  const isProtected = isProtectedRoute(location.pathname);
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -33,7 +40,7 @@ export function AppRoutes() {
   }
 
   // Redirect unauthenticated users away from protected routes
-  if (!isAuthenticated && isProtectedRoute) {
+  if (!isAuthenticated && isProtected) {
     return <Navigate to="/login" replace />;
   }
 
@@ -43,6 +50,7 @@ export function AppRoutes() {
       <Route path="/" element={<Dashboard />} />
       <Route path="/sync" element={<Sync />} />
       <Route path="/projects" element={<Projects />} />
+      <Route path="/projects/:projectId" element={<ProjectDetail />} />
     </Routes>
   );
 }

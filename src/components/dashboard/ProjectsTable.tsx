@@ -31,7 +31,7 @@ import { useProjects, useUpdateProjectStatus, useDeleteProject } from '@/lib/api
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { formatDate } from 'date-fns';
-import { ProjectDetailModal } from './ProjectDetailModal';
+import { useNavigate } from 'react-router';
 import { CreateProjectModal } from './CreateProjectModal';
 import { getProjectStatusBadge } from '@/lib/projectUtils';
 import type { Project } from '@/lib/api/projects';
@@ -54,12 +54,11 @@ interface ProjectsTableProps {
 }
 
 export function ProjectsTable({ title = 'Projects', defaultPageSize = 10 }: ProjectsTableProps) {
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('desc');
   const [autoSyncFilter, setAutoSyncFilter] = useState<boolean | undefined>(undefined);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
@@ -238,8 +237,7 @@ return (
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
                                 onClick={() => {
-                                  setSelectedProjectId(project.id);
-                                  setIsModalOpen(true);
+                                  navigate(`/projects/${project.id}`);
                                 }}
                               >
                                 View Details
@@ -371,12 +369,6 @@ return (
           </>
         )}
       </CardContent>
-
-      <ProjectDetailModal
-        projectId={selectedProjectId}
-        open={isModalOpen}
-        onOpenChange={setIsModalOpen}
-      />
 
       <CreateProjectModal
         open={isEditModalOpen}

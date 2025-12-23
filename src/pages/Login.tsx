@@ -35,16 +35,20 @@ const Login = () => {
 	};
 
 	return (
-		<div className="min-h-screen max-h-screen overflow-hidden flex items-center justify-center">
+		<div className="min-h-screen flex items-center justify-center px-4 py-8 md:py-0">
 			<Card className="w-full max-w-xl rounded-2xl shadow-lg backdrop-blur-sm">
-				<CardContent className="p-8 py-10">
+				<CardContent className="p-4 py-6 sm:p-6 sm:py-8 md:p-8 md:py-10">
 					{/* Logo */}
-					<div className="flex items-center justify-center mb-8">
-						<img src={logo} alt="logo" className="w-full h-full object-contain max-w-1/2" />
+					<div className="flex items-center justify-center mb-6 sm:mb-8">
+						<img 
+							src={logo} 
+							alt="logo" 
+							className="w-full h-full object-contain max-w-[200px] sm:max-w-[250px] md:max-w-[300px]" 
+						/>
 					</div>
 
 					{/* Sign In Title */}
-					<h3 className="text-primary text-2xl font-bold mb-12">Sign In</h3>
+					<h3 className="text-primary text-xl sm:text-2xl font-bold mb-8 sm:mb-10 md:mb-12">Sign In</h3>
 
 					{/* Error Message */}
 					{error && (
@@ -54,10 +58,10 @@ const Login = () => {
 					)}
 
 					{/* Login Form */}
-					<form onSubmit={handleSubmit} className="flex flex-col gap-8">
+					<form onSubmit={handleSubmit} className="flex flex-col gap-6 sm:gap-7 md:gap-8">
 						{/* Email Field */}
-						<div className="flex flex-col gap-3">
-							<Label htmlFor="email" className="text-white">
+						<div className="flex flex-col gap-2 sm:gap-3">
+							<Label htmlFor="email" className="text-white text-sm sm:text-base">
 								Email address <span className="text-primary">*</span>
 							</Label>
 							<Input
@@ -67,12 +71,13 @@ const Login = () => {
 								value={email}
 								onChange={(e) => setEmail(e.target.value)}
 								required
+								className="text-sm sm:text-base"
 							/>
 						</div>
 
 						{/* Password Field */}
-						<div className="flex flex-col gap-3">
-							<Label htmlFor="password" className="text-white">
+						<div className="flex flex-col gap-2 sm:gap-3">
+							<Label htmlFor="password" className="text-white text-sm sm:text-base">
 								Password<span className="text-primary">*</span>
 							</Label>
 							<Input
@@ -82,11 +87,12 @@ const Login = () => {
 								value={password}
 								onChange={(e) => setPassword(e.target.value)}
 								required
+								className="text-sm sm:text-base"
 							/>
 						</div>
 
 						{/* Remember Me and Forgot Password */}
-						<div className="flex items-center justify-between">
+						<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 							<div className="flex items-center space-x-2">
 								<Checkbox
 									id="remember"
@@ -96,7 +102,7 @@ const Login = () => {
 								/>
 								<Label
 									htmlFor="remember"
-									className="text-white cursor-pointer font-normal"
+									className="text-white cursor-pointer font-normal text-sm sm:text-base"
 								>
 									Remember Me
 								</Label>
@@ -117,7 +123,7 @@ const Login = () => {
 						<Button
 							type="submit"
 							disabled={isLoading}
-							className="w-full bg-primary hover:bg-[#ff9500] text-white font-bold py-2 rounded-lg transition-colors mt-5 disabled:opacity-50 disabled:cursor-not-allowed"
+							className="w-full bg-primary hover:bg-[#ff9500] text-white font-bold py-2.5 sm:py-2 rounded-lg transition-colors mt-2 sm:mt-4 md:mt-5 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
 						>
 							{isLoading ? 'Signing in...' : 'Sign In'}
 						</Button>
